@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .chat-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 300px;
+            margin-bottom: 20px;
+            overflow-y: auto;
+            max-height: 500px;
+        }
+        .question {
+            background-color: #e6f7ff;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .answer {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .input-area {
+            display: flex;
+        }
+        input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI Assistant</h1>
+    <div class="chat-container" id="chatContainer">
+        <!-- Chat messages will appear here -->
+    </div>
+    <div class="input-area">
+        <input type="text" id="questionInput" placeholder="Ask a question...">
+        <button onclick="askQuestion()">Send</button>
+    </div>
+
+    <script>
+        // URL of your n8n webhook endpoint - Use the correct webhook URL from your n8n setup
+        const n8nEndpoint = 'https://bella2823.app.n8n.cloud/webhook/ai-assistant';
+        
+        async function askQuestion() {
+            const questionInput = document.getElementById('questionInput');
+            const question = questionInput.value.trim();
+            
+            if (!question) return;
+            
+            // Display the question
+            addMessage('question', question);
+            
+            // Clear input field
+            questionInput.value = '';
+            
+            // Add loading indicator
+            const loadingId = addMessage('loading', 'Thinking...');
+            
+            try {
+                // Send question to n8n workflow
+                const response = await fetch(n8nEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        text: question 
+                    }),
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                const data = await response.json();
+                
+                // Remove loading indicator
+                removeMessage(loadingId);
+                
+                // Display the answer - using the format from your Respond to Webhook node
+                // Based on {{ $json.output }} format
+                const answer = data.output || "No response found";
+                addMessage('answer', answer);
+            } catch (error) {
+                console.error('Error:', error);
+                
+                // Remove loading indicator
+                removeMessage(loadingId);
+                
+                // Display error message
+                addMessage('answer', 'Sorry, there was an error processing your request. ' + error.message);
+            }
+        }
+        
+        function addMessage(type, text) {
+            const chatContainer = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            
+            // Handle possible HTML in the response
+            if (typeof text === 'string') {
+                messageDiv.textContent = text;
+            } else if (typeof text === 'object') {
+                messageDiv.textContent = JSON.stringify(text);
+            }
+            
+            // Generate a unique ID for the message element
+            const messageId = 'msg-' + Date.now();
+            messageDiv.id = messageId;
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            return messageId;
+        }
+        
+        function removeMessage(messageId) {
+            const element = document.getElementById(messageId);
+            if (element) {
+                element.remove();
+            }
+        }
+        
+        // Allow Enter key to submit question
+        document.getElementById('questionInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                askQuestion();
+            }
+        });
+    </script>
+</body>
+</html>
